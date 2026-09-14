@@ -17,10 +17,11 @@
 #
 # "Cythera" and "Delver" are trademarks of either Glenn Andreas or 
 # Ambrosia Software, Inc. 
-import gtk,editors
+from gi.repository import Gtk
+from . import editors, images
 import delv
 import delv.sound
-import os, tempfile, struct, wave, subprocess, images
+import os, tempfile, struct, wave, subprocess
 
 MAGPIE_WARN = """This patch is currently in Magpie format. Saving it will
 change the format to mag.py format, which is not compatible with Magpie. 
@@ -34,39 +35,39 @@ class SoundEditor(editors.Editor):
     s_lsint8 = struct.Struct('b')
     def gui_setup(self):
         self.set_default_size(*self.default_size)
-        pbox = gtk.VBox(False,0)
+        pbox = Gtk.VBox(False,0)
         menu_items = (
             ("/File/Import WAV", "<control>I", self.file_import, 0, None),
             ("/File/Export WAV", "<control>E", self.file_export, 0, None),
             ("/File/Save Resource", "<control>S", self.file_save, 0, None),
             ("/File/Revert", None, self.load, 0, None),)
-        accel = gtk.AccelGroup()
-        ifc = gtk.ItemFactory(gtk.MenuBar, "<main>", accel)
+        accel = Gtk.AccelGroup()
+        ifc = Gtk.ItemFactory(Gtk.MenuBar, "<main>", accel)
         self.add_accel_group(accel)
         ifc.create_items(menu_items)
         self.menu_bar = ifc.get_widget("<main>")
         pbox.pack_start(self.menu_bar, False, True, 0)
-        hbox = gtk.HBox(False,0)
-        hbox.pack_start(gtk.Label("Sampling Rate:"),False,True,0)
-        self.sample_rate = gtk.Entry()
+        hbox = Gtk.HBox(False,0)
+        hbox.pack_start(Gtk.Label("Sampling Rate:"), False, True, 0)
+        self.sample_rate = Gtk.Entry()
         self.sample_rate.set_width_chars(10)
         self.sample_rate.set_editable(False)
         hbox.pack_start(self.sample_rate, True,True,0)
-        hbox.pack_start(gtk.Label("Length:"),False,True,0)
-        self.duration = gtk.Entry()
+        hbox.pack_start(Gtk.Label("Length:"), False, True, 0)
+        self.duration = Gtk.Entry()
         self.duration.set_width_chars(10)
         self.duration.set_editable(False)
         hbox.pack_start(self.duration, True,True,0)
-        hbox.pack_start(gtk.Label("Flags:"),False,True,0)
-        self.flags = gtk.Entry()
+        hbox.pack_start(Gtk.Label("Flags:"), False, True, 0)
+        self.flags = Gtk.Entry()
         self.flags.set_width_chars(6)
         self.flags.set_editable(False)
         hbox.pack_start(self.flags, True,True,0)
         pbox.pack_start(hbox,False)
-        self.play_button = gtk.Button("Play Sound")
+        self.play_button = Gtk.Button("Play Sound")
         pbox.pack_start(self.play_button, False, True, 0)
-        pbox.pack_start(gtk.Label("Sound Player Command"),False,True,0)
-        self.play_command = gtk.Entry()
+        pbox.pack_start(Gtk.Label("Sound Player Command"), False, True, 0)
+        self.play_command = Gtk.Entry()
         self.play_command.set_text(self.redelv.preferences['play_sound_cmd'])
         pbox.pack_start(self.play_command, True,True,5)
         self.add(pbox)
@@ -76,7 +77,7 @@ class SoundEditor(editors.Editor):
         if not path: return
         try:
             wavin = wave.open(path, 'rb')
-        except Exception, e:
+        except Exception as e:
             self.error_message("Couldn't read '%s': %s"%(path,repr(e)))
             return
         if wavin.getnchannels() != 1:
@@ -107,7 +108,7 @@ class SoundEditor(editors.Editor):
         if not path.endswith(".wav"): path += ".wav"
         try:
             self.wave_out(open(path, 'wb'))
-        except Exception, e:
+        except Exception as e:
             self.error_message("Couldn't write '%s': %s"%(path,repr(e)))
     def wave_out(self, fileobj):
         wavout = wave.open(fileobj, 'wb')
