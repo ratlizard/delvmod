@@ -20,10 +20,17 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+# The engine does not animate the colour table. It builds eight 256-byte
+# translation tables, counts a phase 0..7 up by one per animation tick, and
+# passes the finished frame through the table for the current phase, exactly
+# as below. The subtraction is the engine's: a pixel drawn as 0xE0 shows the
+# colour of 0xE7 at phase 1, not 0xE1, so a ramp is walked downwards as the
+# phase rises. It was written here as an addition, which ran water and lava
+# backwards.
 def _pclr(pal,n,f):
     if n < 0xE0: return pal[n]
-    elif n < 0xF0: return pal[(n&0xF8)|((n+f)&7)]
-    elif n < 0xFC: return pal[(n&0xFC)|((n+f)&3)]
+    elif n < 0xF0: return pal[(n&0xF8)|((n-f)&7)]
+    elif n < 0xFC: return pal[(n&0xFC)|((n-f)&3)]
     else: return pal[n]
 
 def panimate(pal):
