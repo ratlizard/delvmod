@@ -11,14 +11,26 @@ http://www.ferazelhosting.net/wiki/
 
 REQUIREMENTS / PYTHON VERSION
 
-redelv requires Python 2.7 and PyGTK (GTK+ 2). PyGTK was never ported to
-Python 3 and is not available on Apple Silicon (arm64) Macs, so redelv does
-not currently run there. Porting it would mean migrating the GUI to
-PyGObject/GTK+ 3, which is a substantial rewrite -- gtk.ItemFactory, used to
-build every menu bar in redelv, was removed outright in GTK+ 3.
+redelv runs on Python 3 with PyGObject and GTK 3. The port from Python 2 and
+PyGTK is the work of Chaim Leib Halbert, on the gtk3-auto branch of
+github.com/chaimleib/delvmod, and is the only one there is; it was merged here
+with its history, so the commits carry their own authorship. On macOS it wants
+'brew install gtk+3 pygobject3', and 'pip install parsley' for the assembler.
 
-The underlying delv module itself does run on Python 3 and on Apple Silicon;
-only this GUI front end is affected.
+The port is not finished. It opens an archive, draws the resource tree and
+offers New, Open, Close, Underlay Scenario, About and Quit. Upstream's Save,
+Import, Export, Edit and Patch menus have no GTK 3 counterpart yet, and no
+editor can be opened at all: the call in row_activated that opened one is
+commented out, and menu_resource_editor was not ported. The editor modules
+themselves are converted, but nothing reaches them.
+
+Until that is finished, editing a resource, assembling a script and making a
+patch are all available without the GUI: see examples/rdasm.py, which assembles
+.rdasm source, and examples/mag.py, which diffs two archives into a Delver
+patch and applies patches to an archive.
+
+The underlying delv module runs on Python 3 and on Apple Silicon whether the
+GUI does or not.
 
 INSTALLING
 pip install .
