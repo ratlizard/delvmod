@@ -234,7 +234,9 @@ class Document(Gtk.WindowGroup):
         if self.cfg.debug: print(f"Document.get_library - {repr(self.window.get_title())}")
         if self.library: return self.library
         try:
-            assert self.underlay, "get_library: self.underlay is None"
+            # delv.library.Library filters a None underlay out of its archive
+            # list, so a scenario opened on its own is a valid one-archive
+            # library; only a saved game needs a scenario under it.
             assert self.archive, "get_library: self.archive is None"
             self.library = delv.library.Library(
                 self.underlay,
