@@ -56,6 +56,25 @@ def decrypt(data, prokey):
 
 encrypt = decrypt # Symmetric.
 
+def constant_keystream(prokey):
+    """If the keystream for this pro-key is a single repeated byte, return that
+       byte; otherwise None.
+
+       Only `key & 0xFF` is ever used, and `(key*m + b) % 256` depends on
+       nothing but `key % 256`, so the low byte evolves on its own. That orbit
+       has fixed points, and for 120 of the 65,280 valid resource ids it starts
+       on one -- so the whole encryption is a XOR with one constant byte. They
+       fall in subindexes 19, 47, 63, 83, 111, 127, 147, 175, 191, 211 and 239,
+       eight or sixteen to a subindex. Two steps settle it: if the second byte
+       of the stream equals the first, every later one does too."""
+    key = (prokey ^ (prokey >> 8)) & 0xFFFF
+    m = ((prokey & 0x3f) << 2) + 1
+    b = prokey >> 6
+    key = (key*m + b) & 0xFFFF
+    first = key & 0xFF
+    key = (key*m + b) & 0xFFFF
+    return first if (key & 0xFF) == first else None
+
 def entropy(data):
     """Return a statistical measure of the entropy of the given data.
        Encrypted (or compressed) data has high entropy. Note that this is
@@ -343,8 +362,45 @@ class Resource(object):
         
         
     def decrypt_if_required(self):
-        print("Decrypt if required", repr(self), self.archive)
-        presumptive = decrypt(self.data, resid(self.subindex, self.n))
+        """Guess whether this resource is encrypted, for a subindex the
+           encryption tables say nothing about -- which in practice means a
+           modified archive with subindexes Cythera itself does not use.
+
+           The entropy measure above is the general instrument: ciphertext from
+           this keystream is flat, and structured cleartext is not. It has one
+           blind spot, and the blind spot is total rather than marginal, so it
+           is handled separately below."""
+        this_resid = resid(self.subindex, self.n)
+        presumptive = decrypt(self.data, this_resid)
+        constant = constant_keystream(this_resid)
+        if constant is not None:
+            # A constant keystream makes the cipher a XOR with one byte, which
+            # is a PERMUTATION of byte values: the two candidates have the same
+            # byte histogram with the labels moved, so entropy() -- which reads
+            # only the shape of that histogram -- returns the identical value
+            # for both. Not nearly, exactly. `>` is then always False and this
+            # method always concluded "not encrypted", so every encrypted
+            # resource at such an id was handed back still encrypted. Measured
+            # against the tables on "Cythera Data": all 14 constant-keystream
+            # resources of subindexes 19 and 47, wrong every time.
+            #
+            # What the permutation does not preserve is WHERE the histogram
+            # sits. Almost every payload in a Delver archive is full of 0x00 --
+            # padding, the high halves of words, string terminators -- and the
+            # XOR moves all of it to the key byte. So the candidate with more
+            # zero bytes is the cleartext. Right on all 23 such resources in
+            # "Cythera Data", and only ever consulted for an id whose keystream
+            # is provably constant.
+            here = self.data.count(0)
+            there = presumptive.count(0)
+            if here != there:
+                self.encrypted = there > here
+                self.canon_encryption = self.encrypted
+                if self.encrypted: self.data = presumptive
+                return
+            # Equally many either way says nothing; fall through rather than
+            # invent a second guess. The comparison below is blind here, but no
+            # blinder than it was before this branch existed.
         if entropy(self.data) > entropy(presumptive):
             self.encrypted = True
             self.canon_encryption = True
@@ -446,7 +502,6 @@ class Archive(object):
     def to_file(self, dest):
         """Write a Delver archive to the destination file-like
            object (must be open for writing, obviously)"""
-        print("Writing out to", repr(dest))
         dest = util.BinaryHandler(dest)
         self.save_header(dest)
         # Skip to just past the spot where we'll put the master index later
@@ -529,7 +584,6 @@ class Archive(object):
         if r is None and create_new:
             r = Resource(0,0,subindex,n,self)
             self.all_subindices[subindex][n] = r
-            print("creating new resource %04X"%idx,r)
         return r
                 
 

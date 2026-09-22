@@ -27,6 +27,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import sys
 from . import archive,hints,tile,prop,util,store
 import array
 class Library(object):
@@ -152,13 +153,15 @@ class Library(object):
         r = self.get_resource(resid)
         if r in self.cache:
             if self.cache[r].is_checked_out():
-                print("WARNING: Someone using %04X, and cache was purged."%(
-                    resid))
-                print("Going to try to reload it instead...")
+                # A real warning rather than a trace, so it goes to stderr:
+                # something is holding this resource while its cache entry is
+                # being thrown away, and the reload below is the recovery.
+                sys.stderr.write(
+                    "delv: %04X was checked out when its cache was purged; "
+                    "reloading it instead\n"%resid)
                 self.cache[r].src.seek(0)
                 self.cache[r].load_from_bfile()
             else:
-                print("purging", resid)
                 del self.cache[r]
     def get_object(self, resid, rw=True):
         """Get the appropriate kind of object for a specified resource."""

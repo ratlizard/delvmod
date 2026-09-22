@@ -198,7 +198,6 @@ class Map(store.Store):
         """Return base tile at this location."""
         return self.map_data[x+y*self.width]
     def load_from_bfile(self):
-        print("map loading")
         self.src.seek(0)
         self.width = self.src.read_uint16()
         self.height = self.src.read_uint16()

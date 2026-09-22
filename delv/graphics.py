@@ -27,6 +27,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import sys
 from . import colormap, util, store
 
 # import the four horsemen of the bitpocalypse:
@@ -128,7 +129,12 @@ class DelvImage(store.Store):
         try:
             if src: self.decompress(self.src.readb(), data_cursor)
         except IndexError as e:
-            print("Cursor", self.cursor, repr(e))
+            # The opcode stream ran off the end. The partial image is kept and
+            # returned, so this is the only notice anyone gets that it is
+            # partial -- stderr, not stdout, which is where the caller's own
+            # output may be going.
+            sys.stderr.write("delv: image decompression stopped at cursor %d: %r\n"%(
+                self.cursor, e))
         self.cached_visual = None
     def decompress(self, data, cursor):
         """Decompress the indexable-item data provided into this image.

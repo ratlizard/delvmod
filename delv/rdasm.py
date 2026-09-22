@@ -1088,9 +1088,12 @@ class Assembler(object):
                         else:
                             table[k] = sv
                     except KeyError:
-                        s= sorted(self.symtab.items())
-                        for l,v in s: print(l,':',v)
-                        print("---> Field%04X"%k)
+                        # About to abort; dump the symbol table so the failure
+                        # can be read, to stderr rather than into the caller's
+                        # output stream.
+                        for l, v in sorted(self.symtab.items()):
+                            sys.stderr.write("%s : %s\n"%(l, v))
+                        sys.stderr.write("---> Field%04X\n"%k)
                         assert False
         dict_write_code(table, of, self, force_order=order)
          

@@ -28,7 +28,8 @@ import delv.graphics
 import delv.level
 import delv.store
 import delv.util
-from delv.archive import Scenario, Patch, Resource, resid
+from delv.archive import (Scenario, Patch, Resource, resid,
+                          constant_keystream, decrypt, entropy)
 
 
 def build_scenario():
@@ -134,6 +135,69 @@ class TestRoundTrip(unittest.TestCase):
         for rid in a.resource_ids():
             self.assertEqual(bytes(a[rid]), bytes(b[rid]),
                              'resource %04X changed in round trip' % rid)
+
+
+class TestEncryptionGuess(unittest.TestCase):
+    """decrypt_if_required, the guess made for a subindex the tables do not
+       cover -- which in practice is a modified archive."""
+
+    def test_constant_keystream_ids_exist_and_are_few(self):
+        # The claim the guess now rests on: the keystream degenerates to one
+        # repeated byte for a small, fixed set of resource ids. If this count
+        # ever moves, the cipher has been misread somewhere.
+        ids = [r for r in range(0x0100, 0x10000)
+               if constant_keystream(r) is not None]
+        self.assertEqual(len(ids), 120)
+        self.assertIn(0x1402, ids)
+        self.assertIn(0xF014, ids)
+        # and they are confined to these subindexes
+        self.assertEqual(sorted({(r >> 8) - 1 for r in ids}),
+                         [19, 47, 63, 83, 111, 127, 147, 175, 191, 211, 239])
+
+    def test_entropy_cannot_see_a_constant_keystream(self):
+        # Why the special case has to exist at all: a constant XOR permutes
+        # byte values, so entropy() returns the SAME number for cleartext and
+        # ciphertext -- exactly, not approximately -- and the `>` test in
+        # decrypt_if_required is therefore always False.
+        resid_const = 0x1402
+        self.assertIsNotNone(constant_keystream(resid_const))
+        clear = bytearray(b'\x00\x00\x01Od_Shutter1\x00' * 8)
+        cipher = decrypt(clear, resid_const)
+        self.assertEqual(entropy(clear), entropy(cipher))
+
+    def test_constant_keystream_resource_is_decrypted(self):
+        # A resource in a subindex nothing knows about, at an id whose
+        # keystream is constant. Before the zero-byte rule this came back
+        # still encrypted, every time.
+        rid = resid(63, 0)                     # subindex 63: no table covers it
+        self.assertIsNotNone(constant_keystream(rid))
+        payload = b'\x00\x00\x01itsState\x00\x00\x02itsLights\x00' * 4
+        a = Scenario()
+        a[rid] = payload
+        b = Scenario()
+        b.from_string(a.to_string())
+        self.assertEqual(bytes(b[rid]), payload)
+
+    def test_reading_and_writing_are_silent_on_stdout(self):
+        # Four functions used to trace normal operation to stdout -- the
+        # encryption guess, "Writing out to", "creating new resource" and
+        # "map loading" -- which any tool reading delv's output on a pipe had
+        # to filter. Warnings and diagnostics still go out, to stderr.
+        # This covers a whole build-write-read cycle, so it guards all four
+        # rather than only the guess.
+        import io, contextlib
+        rid = resid(63, 1)                     # no table covers subindex 63
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            a = Scenario()
+            a[rid] = b'\x00\x00\x01itsState\x00' * 4
+            a[0x0200] = b'\x01\x02\x03encrypted subindex payload'
+            raw = a.to_string()
+            b = Scenario()
+            b.from_string(raw)
+            bytes(b[rid])
+            bytes(b[0x0200])
+        self.assertEqual(buf.getvalue(), '')
 
 
 class TestPatch(unittest.TestCase):
